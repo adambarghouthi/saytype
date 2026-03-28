@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/icon.png" width="128" alt="SayType icon">
+</p>
+
 # SayType
 
 Voice-to-text for macOS. Speak and it types into any focused app.
