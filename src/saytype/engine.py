@@ -121,6 +121,7 @@ class VoiceEngine(threading.Thread):
             beam_size=1,
             best_of=1,
             without_timestamps=True,
+            initial_prompt="Clean, articulate speech without filler words.",
             condition_on_previous_text=False,
             vad_filter=True,
             vad_parameters={"min_silence_duration_ms": 300},
