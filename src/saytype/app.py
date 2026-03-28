@@ -23,7 +23,7 @@ from saytype.keys import (
 )
 from saytype.engine import VoiceEngine
 
-__version__ = "0.1.0"
+__version__ = "0.1.1"
 
 
 class AppDelegate(NSObject):
