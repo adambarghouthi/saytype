@@ -10,37 +10,19 @@ permissions:
 
 jobs:
   build:
-    runs-on: macos-14  # Apple Silicon
+    runs-on: macos-14
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-      - name: Install dependencies
-        run: |
-          pip install --upgrade pip
-          pip install .
-          pip install pyinstaller
-
-      - name: Extract version from tag
+      - name: Extract version
         id: version
         run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_OUTPUT"
 
-      - name: Update version in spec
-        run: |
-          sed -i '' "s/0.1.0/${{ steps.version.outputs.VERSION }}/g" saytype.spec
-
-      - name: Build .app with PyInstaller
-        run: pyinstaller saytype.spec --noconfirm
-
-      - name: Sign .app (ad-hoc)
-        run: codesign --force --deep --sign - "dist/SayType.app"
+      - name: Build .app
+        run: bash Scripts/build-app.sh "${{ steps.version.outputs.VERSION }}"
 
       - name: Build DMG
-        run: bash scripts/build-dmg.sh "${{ steps.version.outputs.VERSION }}"
+        run: bash Scripts/build-dmg.sh "${{ steps.version.outputs.VERSION }}"
 
       - name: Upload DMG
         uses: softprops/action-gh-release@v2

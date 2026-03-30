@@ -7,24 +7,9 @@ on:
     branches: [main]
 
 jobs:
-  check:
+  build:
     runs-on: macos-14
     steps:
       - uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-      - name: Install
-        run: pip install .
-
-      - name: Import check
-        run: python -c "from saytype.engine import VoiceEngine; from saytype.keys import type_text; from saytype.check import run_checks; print('All imports OK')"
-
-      - name: Build check
-        run: |
-          pip install build
-          python -m build
-          echo "Build OK"
+      - name: Build
+        run: swift build -c release

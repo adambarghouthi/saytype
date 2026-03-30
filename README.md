@@ -1,12 +1,8 @@
-<p align="center">
-  <img src="assets/icon.png" width="128" alt="SayType icon">
-</p>
-
 # SayType
 
 Voice-to-text for macOS. Speak and it types into any focused app.
 
-SayType runs as a menu bar app — click to start listening, speak naturally, and your words appear wherever your cursor is. Built for hands-free use.
+SayType runs as a menu bar app — click to start listening, speak naturally, and your words appear wherever your cursor is. Built for hands-free use on Apple Silicon Macs.
 
 ## Features
 
@@ -14,45 +10,23 @@ SayType runs as a menu bar app — click to start listening, speak naturally, an
 - **Menu bar app** — unobtrusive, lives in your toolbar
 - **Works everywhere** — types into any focused app (editors, terminals, browsers)
 - **Voice commands** — say "send", "cancel", "yes", "no" for keyboard actions
-- **Fast** — uses faster-whisper (tiny.en) for low-latency transcription on CPU
+- **Fast** — uses WhisperKit with Core ML, optimized for Apple Silicon
 - **Privacy** — all processing happens locally, nothing leaves your machine
+- **Lightweight** — single binary, no Python, no dependencies to install
 
 ## Requirements
 
-- macOS 13+ (Apple Silicon or Intel)
-- Python 3.11+
-- Microphone
-- Accessibility permission (for keystroke injection)
+- macOS 14+ (Sonoma or later)
+- Apple Silicon Mac (M1, M2, M3, M4)
 
 ## Install
 
-### DMG (easiest)
+Download the latest `.dmg` from [Releases](https://github.com/adambarghouthi/saytype/releases), open it, and drag SayType to Applications.
 
-Download the latest `.dmg` from [Releases](https://github.com/adambargh/saytype/releases), open it, and drag SayType to Applications.
-
-### From source
-
-```bash
-git clone https://github.com/adambargh/saytype.git
-cd saytype
-pip install .
-saytype setup
-```
-
-## Quick Start
-
-```bash
-# First time — downloads model and checks permissions
-saytype setup
-
-# Launch the menu bar app
-saytype start
-
-# Verify everything works
-saytype check
-```
-
-Click **ST** in the menu bar, then click **Start Listening**. A green dot appears when active.
+On first launch, SayType will:
+1. Let you choose a transcription model
+2. Download it (~40 MB for tiny.en)
+3. Guide you through permissions setup
 
 ## Voice Commands
 
@@ -69,13 +43,9 @@ Anything else is typed as dictated text.
 
 | Model | Size | Speed | Quality |
 |-------|------|-------|---------|
-| `tiny.en` | ~75MB | Fast | Good for commands (default) |
-| `small` | ~500MB | Moderate | Better accuracy |
-| `medium` | ~1.5GB | Slower | Best accuracy |
-
-```bash
-saytype start --model small
-```
+| `tiny.en` | ~40 MB | Fastest | Good (default) |
+| `base.en` | ~140 MB | Fast | Better |
+| `small.en` | ~500 MB | Moderate | Best |
 
 ## Permissions
 
@@ -83,17 +53,23 @@ SayType needs two macOS permissions:
 
 1. **Microphone** — prompted automatically on first launch
 2. **Accessibility** — required for typing into other apps
-   - System Settings > Privacy & Security > Accessibility
-   - Add SayType.app or your terminal
+   - System Settings > Privacy & Security > Accessibility > Enable SayType
 
-Run `saytype check` to verify permissions are working.
+## Build from Source
+
+```bash
+git clone https://github.com/adambarghouthi/saytype.git
+cd saytype
+swift build -c release
+bash Scripts/build-app.sh
+```
 
 ## How It Works
 
-1. Microphone audio captured via `sounddevice`
-2. Voice activity detected with `webrtcvad` (aggressiveness 3)
-3. Speech transcribed by `faster-whisper` (local, on-device)
-4. Text injected via clipboard + AppleScript (System Events)
+1. Microphone audio captured via AVAudioEngine
+2. Voice activity detected with RMS energy thresholding
+3. Speech transcribed by WhisperKit (on-device, Core ML)
+4. Text injected via clipboard + CGEventPost
 
 ## License
 
