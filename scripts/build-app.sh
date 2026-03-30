@@ -8,7 +8,13 @@ BUILD_DIR=".build/release"
 echo "=== Building SayType v${VERSION} ==="
 
 # Build release binary
-swift build -c release 2>&1
+# Use Homebrew Swift toolchain if available (local workaround for broken CLT),
+# otherwise fall back to system swift (CI runners)
+if [ -n "${TOOLCHAINS:-}" ] && command -v /opt/homebrew/opt/swift/bin/swift &> /dev/null; then
+    TOOLCHAINS="$TOOLCHAINS" /opt/homebrew/opt/swift/bin/swift build -c release 2>&1
+else
+    swift build -c release 2>&1
+fi
 
 BINARY="$BUILD_DIR/SayType"
 if [ ! -f "$BINARY" ]; then
@@ -23,6 +29,9 @@ mkdir -p "$APP/Contents/Resources"
 
 # Copy binary
 cp "$BINARY" "$APP/Contents/MacOS/SayType"
+
+# Copy app icon
+cp Sources/SayType/Resources/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
 
 # Create Info.plist with version
 cat > "$APP/Contents/Info.plist" << PLIST
