@@ -1,8 +1,7 @@
 import SwiftUI
-import WhisperKit
 
 enum OnboardingStep {
-    case welcome, modelSelection, downloading, permissions, ready
+    case welcome, downloading, permissions, ready
 }
 
 struct OnboardingView: View {
@@ -16,8 +15,6 @@ struct OnboardingView: View {
             switch step {
             case .welcome:
                 welcomeView
-            case .modelSelection:
-                modelSelectionView
             case .downloading:
                 downloadingView
             case .permissions:
@@ -44,7 +41,8 @@ struct OnboardingView: View {
                 .foregroundColor(.secondary)
             Spacer()
             Button("Get Started") {
-                step = .modelSelection
+                step = .downloading
+                downloadModel()
             }
             .buttonStyle(.borderedProminent)
             .controlSize(.large)
@@ -53,79 +51,19 @@ struct OnboardingView: View {
         .padding(40)
     }
 
-    // MARK: - Model Selection
-
-    private var modelSelectionView: some View {
-        VStack(spacing: 20) {
-            Text("Choose a Model")
-                .font(.system(size: 22, weight: .bold))
-            Text("This determines transcription quality and speed.")
-                .foregroundColor(.secondary)
-
-            VStack(spacing: 12) {
-                ForEach(ModelSize.allCases, id: \.self) { model in
-                    modelRow(model)
-                }
-            }
-            .padding(.vertical, 10)
-
-            Spacer()
-
-            Button("Download \(state.selectedModel.displayName)") {
-                step = .downloading
-                downloadModel()
-            }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.large)
-
-            Spacer().frame(height: 20)
-        }
-        .padding(40)
-    }
-
-    private func modelRow(_ model: ModelSize) -> some View {
-        HStack {
-            Image(systemName: state.selectedModel == model ? "checkmark.circle.fill" : "circle")
-                .foregroundColor(state.selectedModel == model ? .accentColor : .secondary)
-                .font(.title2)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(model.displayName)
-                    .font(.headline)
-                Text(model.sizeDescription)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-            Spacer()
-            if ModelManager.shared.isModelDownloaded(model) {
-                Text("Downloaded")
-                    .font(.caption)
-                    .foregroundColor(.green)
-            }
-        }
-        .padding(10)
-        .background(state.selectedModel == model ? Color.accentColor.opacity(0.1) : Color.clear)
-        .cornerRadius(8)
-        .contentShape(Rectangle())
-        .onTapGesture {
-            state.selectedModel = model
-        }
-    }
-
     // MARK: - Downloading
 
     private var downloadingView: some View {
         VStack(spacing: 20) {
             Spacer()
-            Text("Downloading \(state.selectedModel.displayName)")
+            Text("Downloading Model")
                 .font(.system(size: 22, weight: .bold))
-
-            ProgressView(value: state.downloadProgress)
-                .progressViewStyle(.linear)
-                .frame(width: 300)
-
-            Text("\(Int(state.downloadProgress * 100))%")
-                .font(.title2)
+            Text("Setting up speech recognition (~40 MB)")
                 .foregroundColor(.secondary)
+
+            ProgressView()
+                .scaleEffect(1.5)
+                .padding(.top, 10)
 
             if let error = downloadError {
                 Text(error)
@@ -156,9 +94,14 @@ struct OnboardingView: View {
                     title: "Microphone",
                     description: "To hear your voice",
                     granted: state.micPermission,
+                    isDenied: PermissionChecker.checkMicrophone() == .denied,
                     action: {
-                        Task {
-                            state.micPermission = await PermissionChecker.requestMicrophone()
+                        if PermissionChecker.checkMicrophone() == .denied {
+                            PermissionChecker.openMicrophoneSettings()
+                        } else {
+                            Task {
+                                state.micPermission = await PermissionChecker.requestMicrophone()
+                            }
                         }
                     }
                 )
@@ -167,6 +110,7 @@ struct OnboardingView: View {
                     title: "Accessibility",
                     description: "To type into other apps",
                     granted: state.accessibilityPermission,
+                    isDenied: false,
                     action: {
                         PermissionChecker.openAccessibilitySettings()
                     }
@@ -181,13 +125,33 @@ struct OnboardingView: View {
             }
             .buttonStyle(.borderedProminent)
             .controlSize(.large)
+            .disabled(!state.micPermission || !state.accessibilityPermission)
+
+            if !state.micPermission || !state.accessibilityPermission {
+                Text("Grant both permissions above to continue")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
 
             Spacer().frame(height: 20)
         }
         .padding(40)
+        .onChange(of: state.micPermission) { _, newValue in
+            if newValue && state.accessibilityPermission {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    step = .ready
+                }
+            }
+        }
+        .onChange(of: state.accessibilityPermission) { _, newValue in
+            if newValue && state.micPermission {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    step = .ready
+                }
+            }
+        }
         .onAppear {
             refreshPermissions()
-            // Poll accessibility status
             permissionTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
                 Task { @MainActor in
                     refreshPermissions()
@@ -199,7 +163,7 @@ struct OnboardingView: View {
         }
     }
 
-    private func permissionRow(title: String, description: String, granted: Bool, action: @escaping () -> Void) -> some View {
+    private func permissionRow(title: String, description: String, granted: Bool, isDenied: Bool = false, action: @escaping () -> Void) -> some View {
         HStack {
             VStack(alignment: .leading, spacing: 2) {
                 Text(title).font(.headline)
@@ -211,7 +175,7 @@ struct OnboardingView: View {
                     .foregroundColor(.green)
                     .font(.title2)
             } else {
-                Button(title == "Accessibility" ? "Open Settings" : "Grant") {
+                Button(isDenied || title == "Accessibility" ? "Open Settings" : "Grant") {
                     action()
                 }
                 .controlSize(.small)
@@ -250,30 +214,13 @@ struct OnboardingView: View {
 
     private func downloadModel() {
         state.isDownloading = true
-        state.downloadProgress = 0
-        state.saveModelChoice()
 
         Task {
             do {
-                // WhisperKit handles model download internally
-                state.downloadProgress = 0.1
-
-                let config = WhisperKitConfig(
-                    model: state.selectedModel.rawValue,
-                    verbose: false,
-                    prewarm: true
-                )
-
-                // This downloads and loads the model
-                let _ = try await WhisperKit(config)
-
-                state.downloadProgress = 1.0
-                state.modelReady = true
-                state.isDownloading = false
-
-                // Load into transcription engine
                 try await TranscriptionEngine.shared.loadModel()
 
+                state.isDownloading = false
+                state.hasCompletedOnboarding = true
                 step = .permissions
             } catch {
                 downloadError = "Download failed: \(error.localizedDescription)"

@@ -6,26 +6,31 @@ class StatusBarController {
     private let menu: NSMenu
     private let statusMenuItem: NSMenuItem
     private let toggleItem: NSMenuItem
+    private let loginItem: NSMenuItem
     private var greenDot: NSImage?
 
     init() {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         menu = NSMenu()
 
-        // Status line
+        // Initialize all stored properties before using self
         statusMenuItem = NSMenuItem(title: "Idle", action: nil, keyEquivalent: "")
+        toggleItem = NSMenuItem(title: "Start Listening", action: #selector(toggleListening), keyEquivalent: "")
+        loginItem = NSMenuItem(title: "Launch at Login", action: #selector(toggleLaunchAtLogin), keyEquivalent: "")
+
+        // Status line
         statusMenuItem.isEnabled = false
         menu.addItem(statusMenuItem)
 
         // Version
-        let versionItem = NSMenuItem(title: "SayType v1.0.0", action: nil, keyEquivalent: "")
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "dev"
+        let versionItem = NSMenuItem(title: "SayType v\(version)", action: nil, keyEquivalent: "")
         versionItem.isEnabled = false
         menu.addItem(versionItem)
 
         menu.addItem(.separator())
 
         // Toggle listening
-        toggleItem = NSMenuItem(title: "Start Listening", action: #selector(toggleListening), keyEquivalent: "")
         toggleItem.target = self
         menu.addItem(toggleItem)
 
@@ -35,6 +40,11 @@ class StatusBarController {
         let settingsItem = NSMenuItem(title: "Settings...", action: #selector(showSettings), keyEquivalent: ",")
         settingsItem.target = self
         menu.addItem(settingsItem)
+
+        // Launch at Login
+        loginItem.target = self
+        loginItem.state = LaunchAtLogin.isEnabled ? .on : .off
+        menu.addItem(loginItem)
 
         menu.addItem(.separator())
 
@@ -78,6 +88,7 @@ class StatusBarController {
 
     private func updateUI(state: AppState) {
         statusMenuItem.title = state.statusText
+        loginItem.state = LaunchAtLogin.isEnabled ? .on : .off
 
         if state.isListening {
             toggleItem.title = "Stop Listening"
@@ -107,6 +118,10 @@ class StatusBarController {
 
     @objc private func showSettings() {
         OnboardingWindow.shared.show()
+    }
+
+    @objc private func toggleLaunchAtLogin() {
+        LaunchAtLogin.toggle()
     }
 
     @objc private func quit() {

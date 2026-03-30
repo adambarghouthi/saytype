@@ -1,5 +1,8 @@
 import Foundation
+import os.log
 import WhisperKit
+
+private let logger = Logger(subsystem: "com.saytype.app", category: "engine")
 
 @MainActor
 class TranscriptionEngine {
@@ -17,16 +20,18 @@ class TranscriptionEngine {
         let modelName = state.selectedModel.rawValue
 
         state.statusText = "Loading model..."
+        logger.notice("[saytype] Loading model: \(modelName)")
 
         let config = WhisperKitConfig(
             model: modelName,
-            verbose: false,
+            verbose: true,
             prewarm: true
         )
 
         whisperKit = try await WhisperKit(config)
         state.modelReady = true
         state.statusText = "Ready"
+        logger.notice("[saytype] Model loaded, ready")
     }
 
     func start() {
@@ -66,10 +71,10 @@ class TranscriptionEngine {
             try audioEngine.start()
             state.isListening = true
             state.statusText = "Listening"
-            print("[saytype] Started listening.")
+            logger.notice("[saytype] Started listening.")
         } catch {
             state.statusText = "Mic error: \(error.localizedDescription)"
-            print("[saytype] Audio error: \(error)")
+            logger.notice("[saytype] Audio error: \(error)")
         }
     }
 
@@ -78,7 +83,7 @@ class TranscriptionEngine {
         audioEngine.stop()
         state.isListening = false
         state.statusText = "Idle"
-        print("[saytype] Stopped listening.")
+        logger.notice("[saytype] Stopped listening.")
     }
 
     private func transcribe(samples: [Float]) {
@@ -87,7 +92,7 @@ class TranscriptionEngine {
         transcriptionQueue.async { [weak self] in
             guard let self = self else { return }
 
-            print("[saytype] Transcribing \(samples.count) samples...")
+            logger.notice("[saytype] Transcribing \(samples.count) samples...")
 
             Task {
                 do {
@@ -103,27 +108,28 @@ class TranscriptionEngine {
                     let text = results.map { $0.text }.joined(separator: " ").trimmingCharacters(in: .whitespacesAndNewlines)
 
                     guard !text.isEmpty else {
-                        print("[saytype] Empty transcription")
+                        logger.notice("[saytype] Empty transcription")
                         return
                     }
 
-                    print("[saytype] Transcribed: \(text)")
+                    // Log without privacy redaction for debugging
+                    logger.notice("[saytype] Transcribed: \(text, privacy: .public)")
 
                     await MainActor.run {
                         let parsed = self.commandParser.parse(text)
                         switch parsed {
                         case .command(let action):
-                            print("[saytype] Command: \(action)")
+                            logger.notice("[saytype] Command: \(String(describing: action))")
                             AppState.shared.statusText = "Cmd: \(action)"
                             self.executeCommand(action)
                         case .text(let t):
-                            print("[saytype] Injecting: \(t)")
+                            logger.notice("[saytype] Injecting: \(t)")
                             AppState.shared.statusText = "Typed: \(String(t.prefix(40)))"
                             TextInjector.inject(t)
                         }
                     }
                 } catch {
-                    print("[saytype] Transcription error: \(error)")
+                    logger.notice("[saytype] Transcription error: \(error)")
                 }
             }
         }
@@ -139,6 +145,10 @@ class TranscriptionEngine {
             KeystrokeInjector.typeCharAndEnter("y")
         case .reject:
             KeystrokeInjector.typeCharAndEnter("n")
+        case .undo:
+            KeystrokeInjector.deleteWord()
+        case .clearAll:
+            KeystrokeInjector.selectAllAndDelete()
         }
     }
 }

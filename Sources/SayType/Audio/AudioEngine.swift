@@ -7,11 +7,11 @@ class AudioEngine {
     private var speechFrames = 0
     private var inSpeech = false
 
-    // VAD parameters (matching original Python app)
+    // VAD parameters
     private let sampleRate: Double = 16000
-    private let rmsThreshold: Float = 0.008
-    private let silenceRequired: Int = 10  // ~0.3s at 30ms frames
-    private let minSpeechFrames: Int = 5   // ~0.15s
+    private let rmsThreshold: Float = 0.01
+    private let silenceRequired: Int = 25  // ~0.75s silence before ending segment
+    private let minSpeechFrames: Int = 8   // ~0.24s minimum speech (short commands like "send")
     private let maxSpeechFrames: Int = 1000 // ~30s
     private let frameSize: Int = 480       // 30ms at 16kHz
 

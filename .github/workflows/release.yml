@@ -18,6 +18,9 @@ jobs:
         id: version
         run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_OUTPUT"
 
+      - name: Install create-dmg
+        run: brew install create-dmg
+
       - name: Build .app
         run: bash Scripts/build-app.sh "${{ steps.version.outputs.VERSION }}"
 

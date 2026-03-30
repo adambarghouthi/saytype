@@ -36,6 +36,11 @@ class AppState: ObservableObject {
     @Published var micPermission = false
     @Published var accessibilityPermission = false
 
+    var hasCompletedOnboarding: Bool {
+        get { UserDefaults.standard.bool(forKey: "hasCompletedOnboarding") }
+        set { UserDefaults.standard.set(newValue, forKey: "hasCompletedOnboarding") }
+    }
+
     private init() {
         // Load saved model choice
         if let saved = UserDefaults.standard.string(forKey: "selectedModel"),

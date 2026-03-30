@@ -11,6 +11,16 @@ struct KeystrokeInjector {
         postKey(keyCode: 0x08, flags: .maskControl) // C
     }
 
+    static func deleteWord() {
+        postKey(keyCode: 0x33, flags: .maskAlternate) // Option+Backspace = delete word
+    }
+
+    static func selectAllAndDelete() {
+        postKey(keyCode: 0x00, flags: .maskCommand) // Cmd+A
+        usleep(20_000)
+        postKey(keyCode: 0x33) // Backspace
+    }
+
     static func typeCharAndEnter(_ char: Character) {
         // Type the character
         let source = CGEventSource(stateID: .hidSystemState)

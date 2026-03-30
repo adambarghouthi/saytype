@@ -1,7 +1,7 @@
 import Foundation
 
 enum CommandAction: String {
-    case submit, cancel, accept, reject
+    case submit, cancel, accept, reject, undo, clearAll
 }
 
 enum ParseResult {
@@ -11,59 +11,55 @@ enum ParseResult {
 
 struct CommandParser {
     private let commands: [String: CommandAction] = [
-        "send": .submit, "submit": .submit, "enter": .submit, "go": .submit,
+        // Submit (Enter)
+        "send": .submit, "submit": .submit, "enter": .submit,
         "sent": .submit, "sand": .submit, "cent": .submit,
-        "go ahead": .submit, "confirm": .submit, "done": .submit,
-        "cancel": .cancel, "stop": .cancel,
-        "accept": .accept, "yes": .accept, "yeah": .accept, "approve": .accept,
-        "reject": .reject, "no": .reject, "nope": .reject, "deny": .reject,
+        "go ahead": .submit, "confirm": .submit,
+        // Cancel (Ctrl+C)
+        "cancel": .cancel, "cancel that": .cancel,
+        // Accept (y + Enter)
+        "yes": .accept, "yeah": .accept, "approve": .accept,
+        // Reject (n + Enter)
+        "nope": .reject, "deny": .reject, "reject": .reject,
+        // Undo (Option+Backspace = delete word)
+        "undo": .undo, "oops": .undo, "backspace": .undo,
+        // Clear all (Cmd+A, Backspace)
+        "clear all": .clearAll, "erase all": .clearAll, "delete all": .clearAll,
+    ]
+
+    // Single words that are safe to match even within short phrases
+    private let singleWordCommands: [String: CommandAction] = [
+        "send": .submit, "submit": .submit, "enter": .submit,
+        "sent": .submit, "sand": .submit, "cent": .submit,
+        "confirm": .submit,
+        "cancel": .cancel,
+        "yes": .accept, "yeah": .accept, "approve": .accept,
+        "nope": .reject, "deny": .reject, "reject": .reject,
+        "undo": .undo, "oops": .undo, "backspace": .undo,
     ]
 
     func parse(_ text: String) -> ParseResult {
-        var normalized = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalized = text.trimmingCharacters(in: .whitespacesAndNewlines)
             .lowercased()
-            .trimmingCharacters(in: CharacterSet(charactersIn: ".,!?"))
+            .trimmingCharacters(in: .punctuationCharacters)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
 
-        // Strip common prefixes
-        for prefix in ["okay ", "ok ", "please ", "now "] {
-            if normalized.hasPrefix(prefix) {
-                normalized = String(normalized.dropFirst(prefix.count))
-            }
-        }
-
-        // Exact match
+        // Exact match on full text (handles multi-word commands)
         if let action = commands[normalized] {
             return .command(action)
         }
 
-        // Fuzzy match — check if any command is close enough
-        for (trigger, action) in commands {
-            if levenshteinDistance(normalized, trigger) <= max(1, trigger.count / 4) {
-                return .command(action)
+        // For short transcriptions (1-3 words), check individual words
+        // Whisper often adds filler like "Send it." or "Please enter."
+        let words = normalized.split(separator: " ").map(String.init)
+        if words.count <= 3 {
+            for word in words {
+                if let action = singleWordCommands[word] {
+                    return .command(action)
+                }
             }
         }
 
         return .text(text)
-    }
-
-    private func levenshteinDistance(_ a: String, _ b: String) -> Int {
-        let a = Array(a)
-        let b = Array(b)
-        var dist = [[Int]](repeating: [Int](repeating: 0, count: b.count + 1), count: a.count + 1)
-
-        for i in 0...a.count { dist[i][0] = i }
-        for j in 0...b.count { dist[0][j] = j }
-
-        for i in 1...a.count {
-            for j in 1...b.count {
-                let cost = a[i-1] == b[j-1] ? 0 : 1
-                dist[i][j] = min(
-                    dist[i-1][j] + 1,
-                    dist[i][j-1] + 1,
-                    dist[i-1][j-1] + cost
-                )
-            }
-        }
-        return dist[a.count][b.count]
     }
 }

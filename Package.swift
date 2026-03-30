@@ -18,6 +18,7 @@ let package = Package(
                 .linkedFramework("AVFoundation"),
                 .linkedFramework("CoreML"),
                 .linkedFramework("Metal"),
+                .linkedFramework("ServiceManagement"),
             ]
         ),
     ]

@@ -18,9 +18,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         statusBar = StatusBarController()
 
-        // Check if first launch (no model downloaded)
-        if !ModelManager.shared.hasAnyModel() {
+        if !state.hasCompletedOnboarding {
             OnboardingWindow.shared.show()
+        } else {
+            Task {
+                do {
+                    try await TranscriptionEngine.shared.loadModel()
+                } catch {
+                    print("[saytype] Failed to load model: \(error)")
+                    OnboardingWindow.shared.show()
+                }
+            }
         }
     }
 
